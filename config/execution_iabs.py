@@ -9,7 +9,7 @@ from agent.ExchangeAgent import ExchangeAgent
 from agent.NoiseAgent import NoiseAgent
 from agent.ValueAgent import ValueAgent
 from agent.examples.MarketMakerAgent import MarketMakerAgent
-from agent.examples.MomentumAgent import MomentumAgent
+from agent.MomentumAgent import MomentumAgent
 
 from agent.execution.TWAPExecutionAgent import TWAPExecutionAgent
 from agent.execution.VWAPExecutionAgent import VWAPExecutionAgent

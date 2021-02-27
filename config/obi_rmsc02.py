@@ -21,7 +21,7 @@ from util.oracle.SparseMeanRevertingOracle import SparseMeanRevertingOracle
 
 from agent.ExchangeAgent import ExchangeAgent
 from agent.examples.MarketMakerAgent import MarketMakerAgent
-from agent.examples.MomentumAgent import MomentumAgent
+from agent.MomentumAgent import MomentumAgent
 from agent.examples.SubscriptionAgent import SubscriptionAgent
 
 from agent.ZeroIntelligenceAgent import ZeroIntelligenceAgent

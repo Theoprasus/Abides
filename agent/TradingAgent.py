@@ -133,11 +133,13 @@ class TradingAgent(FinancialAgent):
     self.logEvent('ENDING_CASH', cash, True)
     print ("Final holdings for {}: {}.  Marked to market: {}".format(self.name, self.fmtHoldings(self.holdings),
                                                                      cash))
+
     
     # Record final results for presentation/debugging.  This is an ugly way
     # to do this, but it is useful for now.
     mytype = self.type
     gain = cash - self.starting_cash
+    ret = round(gain / self.starting_cash, 3)
 
     if mytype in self.kernel.meanResultByAgentType:
       self.kernel.meanResultByAgentType[mytype] += gain
@@ -146,6 +148,15 @@ class TradingAgent(FinancialAgent):
       self.kernel.meanResultByAgentType[mytype] = gain
       self.kernel.agentCountByType[mytype] = 1
 
+    #adding also return metrics
+    if mytype in self.kernel.meanReturnByAgentType:
+      self.kernel.meanReturnByAgentType[mytype] = self.kernel.meanReturnByAgentType[mytype] \
+                                                  + (ret - self.kernel.meanReturnByAgentType[mytype])\
+                                                  /self.kernel.agentCountByType[mytype]
+      self.kernel.agentCountByType[mytype] += 1
+    else:
+      self.kernel.meanReturnByAgentType[mytype] = ret
+      self.kernel.agentCountByType[mytype] = 1
 
   # Simulation participation messages.
 

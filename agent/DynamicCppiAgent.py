@@ -4,14 +4,14 @@ from util.util import log_print
 from math import sqrt
 import numpy as np
 import pandas as pd
+from math import floor
 
 
-class ZeroIntelligenceAgent(TradingAgent):
+class DynamicCppiAgent(TradingAgent):
 
-    def __init__(self, id, name, type, symbol='IBM', starting_cash=100000, sigma_n=1000,
-                 r_bar=100000, kappa=0.05, sigma_s=100000, q_max=10,
-                 sigma_pv=5000000, R_min=0, R_max=250, eta=1.0,
-                 lambda_a=0.005, log_orders=False, random_state=None):
+    def __init__(self, id, name, type, symbol='IBM', starting_cash=100000, sigma_n=10000,
+                 r_bar=100000, kappa=0.05, sigma_s=100000,
+                 lambda_a=0.005, log_orders=False, random_state=None, m = 1.5, f = 5000000):
 
         # Base class init.
         super().__init__(id, name, type, starting_cash=starting_cash, log_orders=log_orders, random_state=random_state)
@@ -22,11 +22,6 @@ class ZeroIntelligenceAgent(TradingAgent):
         self.r_bar = r_bar  # true mean fundamental value
         self.kappa = kappa  # mean reversion parameter
         self.sigma_s = sigma_s  # shock variance
-        self.q_max = q_max  # max unit holdings
-        self.sigma_pv = sigma_pv  # private value variance
-        self.R_min = R_min  # min requested surplus
-        self.R_max = R_max  # max requested surplus
-        self.eta = eta  # strategic threshold
         self.lambda_a = lambda_a  # mean arrival rate of ZI agents
 
         # The agent uses this to track whether it has begun its strategy or is still
@@ -45,10 +40,11 @@ class ZeroIntelligenceAgent(TradingAgent):
         # units have passed.
         self.prev_wake_time = None
 
-        # The agent has a private value for each incremental unit.
-        self.theta = [int(x) for x in sorted(
-            np.round(self.random_state.normal(loc=0, scale=sqrt(sigma_pv), size=(q_max * 2))).tolist(),
-            reverse=True)]
+        self.percent_aggr = 0.1                 #percent of time that the agent will aggress the spread
+        self.size = np.random.randint(20, 50)   #size that the agent will be placing
+        self.depth_spread = 2
+        self.multi = m
+        self.floor = f
 
     def kernelStarting(self, startTime):
         # self.kernel is set in Agent.kernelInitializing()
@@ -65,37 +61,26 @@ class ZeroIntelligenceAgent(TradingAgent):
         # Print end of day valuation.
         H = int(round(self.getHoldings(self.symbol), -2) / 100)
         # May request real fundamental value from oracle as part of final cleanup/stats.
-        if self.symbol != 'ETF':
-            rT = self.oracle.observePrice(self.symbol, self.currentTime, sigma_n=0, random_state=self.random_state)
-        else:
-            portfolio_rT, rT = self.oracle.observePortfolioPrice(self.symbol, self.portfolio, self.currentTime,
-                                                                 sigma_n=0,
-                                                                 random_state=self.random_state)
 
-        # Start with surplus as private valuation of shares held.
-        if H > 0:
-            surplus = sum([self.theta[x + self.q_max - 1] for x in range(1, H + 1)])
-        elif H < 0:
-            surplus = -sum([self.theta[x + self.q_max - 1] for x in range(H + 1, 1)])
-        else:
-            surplus = 0
+        #marked to fundamental
+        rT = self.oracle.observePrice(self.symbol, self.currentTime, sigma_n=0, random_state=self.random_state)
 
-        log_print("surplus init: {}", surplus)
-
-        # Add final (real) fundamental value times shares held.
-        surplus += rT * H
+        # final (real) fundamental value times shares held.
+        surplus = rT * H
 
         log_print("surplus after holdings: {}", surplus)
 
         # Add ending cash value and subtract starting cash value.
         surplus += self.holdings['CASH'] - self.starting_cash
+        surplus = float( surplus )/self.starting_cash
 
         self.logEvent('FINAL_VALUATION', surplus, True)
 
         log_print(
-            "{} final report.  Holdings {}, end cash {}, start cash {}, final fundamental {}, preferences {}, surplus {}",
-            self.name, H, self.holdings['CASH'], self.starting_cash, rT, self.theta, surplus)
+            "{} final report.  Holdings {}, end cash {}, start cash {}, final fundamental {}, surplus {}",
+            self.name, H, self.holdings['CASH'], self.starting_cash, rT, surplus)
 
+        #print("Final surplus", self.name, surplus)
 
     def wakeup(self, currentTime):
         # Parent class handles discovery of exchange times and market_open wakeup call.
@@ -121,41 +106,17 @@ class ZeroIntelligenceAgent(TradingAgent):
             # Market is closed and we already got the daily close price.
             return
 
-        # Schedule a wakeup for the next time this agent should arrive at the market
-        # (following the conclusion of its current activity cycle).
-        # We do this early in case some of our expected message responses don't arrive.
-
-        # Agents should arrive according to a Poisson process.  This is equivalent to
-        # each agent independently sampling its next arrival time from an exponential
-        # distribution in alternate Beta formation with Beta = 1 / lambda, where lambda
-        # is the mean arrival rate of the Poisson process.
         delta_time = self.random_state.exponential(scale=1.0 / self.lambda_a)
         self.setWakeup(currentTime + pd.Timedelta('{}ns'.format(int(round(delta_time)))))
 
-        # If the market has closed and we haven't obtained the daily close price yet,
-        # do that before we cease activity for the day.  Don't do any other behavior
-        # after market close.
         if self.mkt_closed and (not self.symbol in self.daily_close_price):
             self.getCurrentSpread(self.symbol)
             self.state = 'AWAITING_SPREAD'
             return
 
-        # Issue cancel requests for any open orders.  Don't wait for confirmation, as presently
-        # the only reason it could fail is that the order already executed.  (But requests won't
-        # be generated for those, anyway, unless something strange has happened.)
         self.cancelOrders()
 
-        # The ZI agent doesn't try to maintain a zero position, so there is no need to exit positions
-        # as some "active trading" agents might.  It might exit a position based on its order logic,
-        # but this will be as a natural consequence of its beliefs.
-
-        # In order to use the "strategic threshold" parameter (eta), the ZI agent needs the current
-        # spread (inside bid/ask quote).  It would not otherwise need any trade/quote information.
-
-        # If the calling agent is a subclass, don't initiate the strategy section of wakeup(), as it
-        # may want to do something different.
-
-        if type(self) == ZeroIntelligenceAgent:
+        if type(self) == DynamicCppiAgent:
             self.getCurrentSpread(self.symbol)
             self.state = 'AWAITING_SPREAD'
         else:
@@ -172,19 +133,6 @@ class ZeroIntelligenceAgent(TradingAgent):
                                          random_state=self.random_state)
 
         log_print("{} observed {} at {}", self.name, obs_t, self.currentTime)
-
-        # Flip a coin to decide if we will buy or sell a unit at this time.
-        q = int(self.getHoldings(self.symbol) / 100) # q now represents an index to how many 100 lots are held
-
-        if q >= self.q_max:
-            buy = False
-            log_print("Long holdings limit: agent will SELL")
-        elif q <= -self.q_max:
-            buy = True
-            log_print("Short holdings limit: agent will BUY")
-        else:
-            buy = bool(self.random_state.randint(0, 2))
-            log_print("Coin flip: agent will {}", "BUY" if buy else "SELL")
 
         # Update internal estimates of the current fundamental value and our error of same.
 
@@ -237,49 +185,70 @@ class ZeroIntelligenceAgent(TradingAgent):
 
         log_print("{} estimates r_T = {} as of {}", self.name, r_T, self.currentTime)
 
-        # Determine the agent's total valuation.
-        q += (self.q_max - 1)
-        theta = self.theta[q + 1 if buy else q]
-        v = r_T + theta
-
-        log_print("{} total unit valuation is {} (theta = {})", self.name, v, theta)
-
-        # Return values needed to implement strategy and select limit price.
-        return v, buy
+        return r_T
 
     def placeOrder(self):
-        # Called when it is time for the agent to determine a limit price and place an order.
-        # updateEstimates() returns the agent's current total valuation for the share it
-        # is considering to trade and whether it will buy or sell that share.
-        v, buy = self.updateEstimates()
+        #estimate final value of the fundamental price
+        #used for surplus calculation
+        r_T = self.updateEstimates()
 
-        # Select a requested surplus for this trade.
-        R = self.random_state.randint(self.R_min, self.R_max + 1)
-
-        # Determine the limit price.
-        p = v - R if buy else v + R
-
-        # Either place the constructed order, or if the agent could secure (eta * R) surplus
-        # immediately by taking the inside bid/ask, do that instead.
         bid, bid_vol, ask, ask_vol = self.getKnownBidAsk(self.symbol)
-        if buy and ask_vol > 0:
-            R_ask = v - ask
-            if R_ask >= (self.eta * R):
-                log_print("{} desired R = {}, but took R = {} at ask = {} due to eta", self.name, R, R_ask, ask)
-                p = ask
-            else:
-                log_print("{} demands R = {}, limit price {}", self.name, R, p)
-        elif (not buy) and bid_vol > 0:
-            R_bid = bid - v
-            if R_bid >= (self.eta * R):
-                log_print("{} desired R = {}, but took R = {} at bid = {} due to eta", self.name, R, R_bid, bid)
-                p = bid
-            else:
-                log_print("{} demands R = {}, limit price {}", self.name, R, p)
 
-        # Place the order.
-        size = 100
-        self.placeLimitOrder(self.symbol, size, buy, p)
+        if bid and ask:
+            mid = int((ask+bid)/2)
+            spread = abs(ask - bid)
+
+            M = self.multi
+            # allowable floor
+            F = self.floor
+            # total assets total value of shares + cash
+            TA = self.markToMarket(self.holdings)  # - self.holdings['CASH']
+            shareValue = TA - self.holdings['CASH']
+            # CPPI strategy
+
+
+
+
+
+            if r_T < mid:
+                #fundamental belief that price will go down, place a sell order
+                buy = False
+                #strictly less then one
+                ratio = r_T / mid
+                M = M * ratio
+                MoneyToInvest = M * (TA - F)
+                self.cppiPlaceOrder(mid, shareValue, MoneyToInvest)
+
+
+            elif r_T >= mid:
+                #fundamental belief that price will go up, buy order
+                buy = True
+                ratio = r_T / mid
+                M = M * ratio
+                MoneyToInvest = M * (TA - F)
+                self.cppiPlaceOrder(mid, shareValue, MoneyToInvest)
+
+
+    def cppiPlaceOrder(self, midpoint, shareValue, MoneyToInvest ):
+        if (shareValue < MoneyToInvest) and (midpoint > 0) and (shareValue >= 0) and (MoneyToInvest > 0):
+            quantity = floor((MoneyToInvest - shareValue) / midpoint)
+            # it is true that is a buy order for that quantity
+            if (self.holdings['CASH'] - (quantity * midpoint)) >= 0:
+                self.placeMarketOrder(self.symbol, quantity, True, ignore_risk=False)
+
+        elif (shareValue > MoneyToInvest) and (midpoint > 0) and (MoneyToInvest > 0):
+            quantity = floor((shareValue - MoneyToInvest) / midpoint)
+            self.placeMarketOrder(self.symbol, quantity, False, ignore_risk=False)
+
+        elif (shareValue > MoneyToInvest) and (midpoint > 0) and (MoneyToInvest < 0) and (shareValue > 0):
+            # just sell everything but do not go negative
+            quantity = floor(shareValue / midpoint)
+            self.placeMarketOrder(self.symbol, quantity, False, ignore_risk=False)
+
+        elif (shareValue > MoneyToInvest) and (midpoint > 0) and (MoneyToInvest < 0) and (shareValue < 0):
+            # just what we do in negative situation?
+            quantity = abs(floor(shareValue / midpoint))
+            self.placeMarketOrder(self.symbol, quantity, True, ignore_risk=False)
 
     def receiveMessage(self, currentTime, msg):
         # Parent class schedules market open wakeup call once market open/close times are known.
@@ -305,10 +274,9 @@ class ZeroIntelligenceAgent(TradingAgent):
                 self.placeOrder()
                 self.state = 'AWAITING_WAKEUP'
 
-    # Internal state and logic specific to this agent subclass.
+        # Cancel all open orders.
+        # Return value: did we issue any cancellation requests?
 
-    # Cancel all open orders.
-    # Return value: did we issue any cancellation requests?
     def cancelOrders(self):
         if not self.orders: return False
 

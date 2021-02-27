@@ -20,7 +20,7 @@ from model.LatencyModel import LatencyModel
 
 from agent.ExchangeAgent import ExchangeAgent
 from agent.market_makers.MarketMakerAgent import MarketMakerAgent
-from agent.examples.MomentumAgent import MomentumAgent
+from agent.MomentumAgent import MomentumAgent
 
 from agent.ZeroIntelligenceAgent import ZeroIntelligenceAgent
 from agent.HeuristicBeliefLearningAgent import HeuristicBeliefLearningAgent

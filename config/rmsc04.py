@@ -23,9 +23,10 @@ from Kernel import Kernel
 from agent.CppiAgent import CppiAgent
 from agent.ExchangeAgent import ExchangeAgent
 from agent.MomentumAgent import MomentumAgent
-from agent.NoiseAgent import NoiseAgent
+from agent.NoiseAgentS import NoiseAgentS
 from agent.ValueAgent import ValueAgent
 from agent.WbrAgent import WbrAgent
+
 from agent.DynamicCppiAgent import DynamicCppiAgent
 from agent.BHAgent import BHAgent
 from agent.execution.POVExecutionAgent import POVExecutionAgent
@@ -58,7 +59,7 @@ parser.add_argument('--start-time',
                     help='Starting time of simulation.'
                     )
 parser.add_argument('--end-time',
-                    default='15:30:00',
+                    default='11:30:00',
                     type=parse,
                     help='Ending time of simulation.'
                     )
@@ -165,7 +166,7 @@ agent_count, agents, agent_types = 0, [], []
 symbol = args.ticker
 starting_cash = 10000000  # Cash in this simulator is always in CENTS.
 
-r_bar = 1e5
+r_bar = 1e4
 sigma_n = r_bar / 10
 kappa = 1.67e-15
 lambda_a = 7e-11
@@ -176,7 +177,7 @@ symbols = {symbol: {'r_bar': r_bar,
                     'sigma_s': 0,
                     'fund_vol': args.fund_vol,
                     'megashock_lambda_a': 2.77778e-13, #instead of 18
-                    'megashock_mean': 2e3,
+                    'megashock_mean': 1e3,
                     'megashock_var': 5e4,
                     'random_state': np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32, dtype='uint64'))}}
 
@@ -206,12 +207,12 @@ agent_count += 1
 
 # 2) Noise Agents
 num_noise = 5000
-noise_mkt_open = historical_date + pd.to_timedelta("09:00:00")  # These times needed for distribution of arrival times
+noise_mkt_open = historical_date + pd.to_timedelta("09:32:00")  # These times needed for distribution of arrival times
                                                                 # of Noise Agents
-noise_mkt_close = historical_date + pd.to_timedelta("16:00:00")
-agents.extend([NoiseAgent(id=j,
-                          name="NoiseAgent {}".format(j),
-                          type="NoiseAgent",
+noise_mkt_close = historical_date + pd.to_timedelta("15:20:00")
+agents.extend([NoiseAgentS(id=j,
+                          name="NoiseAgentS {}".format(j),
+                          type="NoiseAgentS",
                           symbol=symbol,
                           starting_cash=starting_cash,
                           wakeup_time=util.get_wake_time(noise_mkt_open, noise_mkt_close),
@@ -219,7 +220,7 @@ agents.extend([NoiseAgent(id=j,
                           random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32, dtype='uint64')))
                for j in range(agent_count, agent_count + num_noise)])
 agent_count += num_noise
-agent_types.extend(['NoiseAgent'])
+agent_types.extend(['NoiseAgentS'])
 
 # 3) Value Agents
 num_value = 100
@@ -336,9 +337,9 @@ agent_types.extend(['WbrAgent'])
 # 5d) BH AGENT
 
 num_bh = 10
-bh_mkt_open = historical_date + pd.to_timedelta("09:00:00")  # These times needed for distribution of arrival times
+bh_mkt_open = historical_date + pd.to_timedelta("09:32:00")  # These times needed for distribution of arrival times
 
-bh_mkt_close = historical_date + pd.to_timedelta("12:00:00")
+bh_mkt_close = historical_date + pd.to_timedelta("09:50:00")
 agents.extend([BHAgent(id=j,
                           name="BHAgent {}".format(j),
                           type="BHAgent",
@@ -346,7 +347,6 @@ agents.extend([BHAgent(id=j,
                           starting_cash=starting_cash,
                           wakeup_time=util.get_wake_time(bh_mkt_open, bh_mkt_close),
                           log_orders=log_orders,
-                          weigth=0.2,
                           random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32, dtype='uint64')))
                for j in range(agent_count, agent_count + num_bh)])
 agent_count += num_bh

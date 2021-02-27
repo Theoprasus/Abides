@@ -34,6 +34,7 @@ class Kernel:
 
     # TODO: This is financial, and so probably should not be here...
     self.meanResultByAgentType = {}
+    self.meanReturnByAgentType = {}
     self.agentCountByType = {}
 
     # The Kernel maintains a summary log to which agents can write
@@ -319,7 +320,9 @@ class Kernel:
     for a in self.meanResultByAgentType:
       value = self.meanResultByAgentType[a]
       count = self.agentCountByType[a]
-      print ("{}: {:d}".format(a, int(round(value / count))))
+      ret = self.meanReturnByAgentType[a]
+
+      print ("{}: {:d} return: {:8.4f}".format(a, int(round(value / count)), ret))
 
     print ("Simulation ending!")
 

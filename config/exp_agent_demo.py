@@ -22,7 +22,7 @@ from agent.ExchangeAgent import ExchangeAgent
 from agent.NoiseAgent import NoiseAgent
 from agent.ValueAgent import ValueAgent
 from agent.market_makers.AdaptiveMarketMakerAgent import AdaptiveMarketMakerAgent
-from agent.examples.MomentumAgent import MomentumAgent
+from agent.MomentumAgent import MomentumAgent
 from agent.examples.ExampleExperimentalAgent import ExampleExperimentalAgentTemplate, ExampleExperimentalAgent
 from model.LatencyModel import LatencyModel
 

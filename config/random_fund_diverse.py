@@ -15,7 +15,7 @@ from agent.ExchangeAgent import ExchangeAgent
 from agent.NoiseAgent import NoiseAgent
 from agent.ValueAgent import ValueAgent
 from agent.market_makers.MarketMakerAgent import MarketMakerAgent
-from agent.examples.MomentumAgent import MomentumAgent
+from agent.MomentumAgent import MomentumAgent
 
 ########################################################################################################################
 ############################################### GENERAL CONFIG #########################################################

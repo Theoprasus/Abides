@@ -4,7 +4,7 @@ from agent.OrderBookImbalanceAgent import OrderBookImbalanceAgent
 from agent.ValueAgent import ValueAgent
 from agent.ZeroIntelligenceAgent import ZeroIntelligenceAgent
 from agent.examples.MarketMakerAgent import MarketMakerAgent
-from agent.examples.MomentumAgent import MomentumAgent
+from agent.MomentumAgent import MomentumAgent
 from statistics import median, mean, stdev
 from util.order import LimitOrder
 from util.oracle.SparseMeanRevertingOracle import SparseMeanRevertingOracle

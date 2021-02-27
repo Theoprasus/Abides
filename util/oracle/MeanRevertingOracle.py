@@ -64,7 +64,7 @@ class MeanRevertingOracle:
 
     s = pd.Series(index=date_range)
     r = np.zeros(len(s.index))
-    r[0] = r_bar
+    r[0] = r_bar #+ r_bar * 0.15
 
     # Predetermine the random shocks for all time steps (at once, for computation speed).
     shock = np.random.normal(scale=sigma_s, size=(r.shape[0]))

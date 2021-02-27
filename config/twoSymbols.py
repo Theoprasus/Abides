@@ -4,7 +4,7 @@ from agent.etf.EtfPrimaryAgent import EtfPrimaryAgent
 from agent.HeuristicBeliefLearningAgent import HeuristicBeliefLearningAgent
 from agent.examples.ImpactAgent import ImpactAgent
 from agent.ZeroIntelligenceAgent import ZeroIntelligenceAgent
-from agent.examples.MomentumAgent import MomentumAgent
+from agent.MomentumAgent import MomentumAgent
 from agent.etf.EtfArbAgent import EtfArbAgent
 from agent.etf.EtfMarketMakerAgent import EtfMarketMakerAgent
 from util.order import LimitOrder

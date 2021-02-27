@@ -5,6 +5,9 @@ from model.LatencyModel import LatencyModel
 from util.order import LimitOrder
 from util.oracle.SparseMeanRevertingOracle import SparseMeanRevertingOracle
 from util import util
+from agent.CppiAgent import CppiAgent
+from agent.MomentumAgent import MomentumAgent
+from model.LatencyModel import LatencyModel
 
 import numpy as np
 import pandas as pd
@@ -126,8 +129,9 @@ defaultComputationDelay = 1000000000        # one second
 # and variance control the size (bimodal distribution) of the individual shocks.
 
 # Note: sigma_s is no longer used by the agents or the fundamental (for sparse discrete simulation).
+#2.77778e-13
 
-symbols = { 'JPM' : { 'r_bar' : 1e5, 'kappa' : 1.67e-12, 'agent_kappa' : 1.67e-15, 'sigma_s' : 0, 'fund_vol' : 1e-8, 'megashock_lambda_a' : 2.77778e-13, 'megashock_mean' : 1e3, 'megashock_var' : 5e4, 'random_state' : np.random.RandomState(seed=np.random.randint(low=0,high=2**32, dtype='uint64')) } }
+symbols = { 'JPM' : { 'r_bar' : 1e5, 'kappa' : 1.67e-12, 'agent_kappa' : 1.67e-15, 'sigma_s' : 0, 'fund_vol' : 1e-8, 'megashock_lambda_a' : 2.77778e-13, 'megashock_mean' : 1e4, 'megashock_var' : 5e4, 'random_state' : np.random.RandomState(seed=np.random.randint(low=0,high=2**32, dtype='uint64')) } }
  
 
 ### Configure the Kernel.
@@ -192,6 +196,27 @@ for i,x in enumerate(zi):
   agents.extend([ ZeroIntelligenceAgent(j, "ZI Agent {} {}".format(j, strat_name), "ZeroIntelligenceAgent {}".format(strat_name), random_state = np.random.RandomState(seed=np.random.randint(low=0,high=2**32, dtype='uint64')),log_orders=log_orders, symbol=symbol, starting_cash=starting_cash, sigma_n=sigma_n, r_bar=s['r_bar'], kappa=s['agent_kappa'], sigma_s=s['fund_vol'], q_max=10, sigma_pv=5e6, R_min=x[1], R_max=x[2], eta=x[3], lambda_a=1e-12) for j in range(agent_count,agent_count+x[0]) ])
   agent_types.extend([ "ZeroIntelligenceAgent {}".format(strat_name) for j in range(x[0]) ])
   agent_count += x[0]
+
+'''
+#### CPPI AGENT
+
+num_cppi = 50
+
+agents.extend([CppiAgent(id=j,
+                          name="CppiAgent {}".format(j),
+                          type="CppiAgent",
+                          symbol=symbol,
+                          starting_cash=starting_cash,
+                          wake_up_freq = '40s',
+                          log_orders=log_orders,
+                          random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32, dtype='uint64'))
+                          )
+               for j in range(agent_count, agent_count + num_cppi)])
+agent_count += num_cppi
+agent_types.extend(['CppiAgent'])
+'''
+
+
 
 
 latency = None
@@ -259,6 +284,22 @@ else:
 
 ### END NEW LATENCY MODEL CONFIGURATION ###
 
+
+# All agents sit on line from Seattle to NYC
+nyc_to_seattle_meters = 3866660
+pairwise_distances = util.generate_uniform_random_pairwise_dist_on_line(0.0, nyc_to_seattle_meters, agent_count,
+                                                                        random_state=latency_rstate)
+pairwise_latencies = util.meters_to_light_ns(pairwise_distances)
+
+model_args = {
+    'connected': True,
+    'min_latency': pairwise_latencies
+}
+
+latency_model = LatencyModel(latency_model='deterministic',
+                             random_state=latency_rstate,
+                             kwargs=model_args
+                             )
 
 # Start the kernel running.
 kernel.runner(agents = agents, startTime = kernelStartTime,
